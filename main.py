@@ -26,42 +26,42 @@ def start_listing():
 
 def list_files_and_folders(folder_path, max_depth):
     text_output.delete(1.0, tk.END)
-    try:
-        for root, dirs, files in os.walk(folder_path):
-            # Calculate level: selected folder is level 1
-            if root == folder_path:
-                level = 1
+
+    folder_path = os.path.abspath(os.path.normpath(folder_path))
+    root_name = os.path.basename(folder_path) or folder_path
+
+    text_output.insert(tk.END, f"[{root_name}]\n")
+
+    def walk_dir(path, depth):
+        if depth > max_depth:
+            return
+
+        try:
+            entries = list(os.scandir(path))
+        except OSError as e:
+            indent = "│   " * depth
+            text_output.insert(tk.END, f"{indent}无法读取: {e}\n")
+            return
+
+        dirs = sorted([e for e in entries if e.is_dir(follow_symlinks=False)], key=lambda x: x.name.lower())
+        files = sorted([e for e in entries if e.is_file(follow_symlinks=False)], key=lambda x: x.name.lower())
+
+        all_items = dirs + files
+
+        for index, item in enumerate(all_items):
+            is_last = index == len(all_items) - 1
+            prefix = "└── " if is_last else "├── "
+            indent = "│   " * (depth - 1)
+
+            if item.is_dir(follow_symlinks=False):
+                text_output.insert(tk.END, f"{indent}{prefix}[{item.name}]\n")
+
+                if depth < max_depth:
+                    walk_dir(item.path, depth + 1)
             else:
-                level = root[len(folder_path):].count(os.sep) + 1
-                # Ensure no negative
-                if level < 1:
-                    level = 1
+                text_output.insert(tk.END, f"{indent}{prefix}{item.name}\n")
 
-            if level > max_depth:
-                dirs.clear()
-                continue
-
-            # Display folder
-            if level == 1:
-                folder_name = os.path.basename(folder_path) or folder_path
-                indent = "├── "
-            else:
-                indent = "│   " * (level - 1) + "├── "
-                folder_name = os.path.basename(root)
-            text_output.insert(tk.END, f"{indent}[{folder_name}]\n")
-
-            # Display files only if not at the max depth
-            if level < max_depth:
-                for file in files:
-                    file_indent = "│   " * level + "├── "
-                    text_output.insert(tk.END, f"{file_indent}{file}\n")
-
-            # Prevent deeper recursion at max depth
-            if level == max_depth:
-                dirs.clear()
-
-    except OSError as e:
-        text_output.insert(tk.END, f"无法读取文件夹 {folder_path}: {e}\n")
+    walk_dir(folder_path, 1)
 
 # GUI setup
 root = tk.Tk()
@@ -89,3 +89,4 @@ text_output = scrolledtext.ScrolledText(root, wrap=tk.WORD, font=("Consolas", 10
 text_output.grid(row=3, column=0, columnspan=3, padx=10, pady=5, sticky="nsew")
 
 root.mainloop()
+
